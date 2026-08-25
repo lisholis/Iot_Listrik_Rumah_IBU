@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <!-- Meta viewport sangat penting untuk PWA mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kontrol IoT Rumah</title>
+    
+    <!-- Link ke Manifest PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .card-on {
+            box-shadow: 0 0 25px 2px rgba(234, 179, 8, 0.4);
+            border-color: rgba(234, 179, 8, 0.8);
+        }
+        .card-off {
+            box-shadow: none;
+            border-color: #334155;
+        }
+        body {
+            background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+            /* Mencegah highlight biru saat tombol ditekan di HP */
+            -webkit-tap-highlight-color: transparent; 
+        }
+    </style>
+</head>
+<body class="text-white font-sans antialiased min-h-screen select-none">
+
+    <div class="max-w-md mx-auto min-h-screen flex flex-col p-5 relative pb-20">
+        
+        <!-- Header -->
+        <div class="text-center mt-4 mb-6">
+            <h1 class="text-3xl font-bold tracking-wide">Kontrol <span class="text-teal-400">IoT</span> Rumah</h1>
+            <div class="flex items-center justify-center gap-2 mt-2 text-sm text-gray-300">
+                <span class="bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded font-bold">B</span>
+                Berbasis Blynk
+                <span class="ml-3 flex items-center text-teal-400 font-medium">
+                    <div class="w-2 h-2 bg-teal-400 rounded-full mr-1.5 animate-pulse"></div> Online
+                </span>
+            </div>
+        </div>
+
+        <!-- Banner Sistem Terhubung -->
+        <div class="bg-slate-800/60 rounded-2xl p-4 mb-6 border border-slate-700 flex items-center justify-between backdrop-blur-sm">
+            <div class="flex items-center gap-3">
+                <div class="text-teal-400 text-xl"><i class="fa-solid fa-shield-halved"></i></div>
+                <div>
+                    <h3 class="text-teal-400 font-semibold text-sm">Sistem Terhubung</h3>
+                    <p class="text-xs text-gray-400" id="status-text">Menyinkronkan data...</p>
+                </div>
+            </div>
+            <div class="text-teal-400"><i id="sync-icon" class="fa-solid fa-arrows-rotate animate-spin"></i></div>
+        </div>
+
+        <!-- Grid Tombol Lampu -->
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Tombol Lampu 1 -->
+            <div id="card-1" class="bg-slate-800/80 rounded-[2rem] p-5 flex flex-col items-center justify-between border-2 card-off transition-all duration-300 cursor-pointer h-64" onclick="toggleLamp(1)">
+                <div class="text-center mb-2">
+                    <h2 class="font-bold text-lg">Kontrol 1</h2>
+                    <p class="text-xs text-gray-400">Teras dan Halaman</p>
+                </div>
+                <div id="icon-bg-1" class="w-24 h-24 rounded-full border-2 border-slate-500 flex items-center justify-center mb-2 transition-all duration-300">
+                    <i id="icon-1" class="fa-solid fa-lightbulb text-slate-400 text-4xl"></i>
+                </div>
+                <div id="badge-1" class="bg-slate-600 text-gray-300 text-xs font-bold px-5 py-2 rounded-full flex items-center gap-2 mt-auto">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full"></div> <span id="text-1">MEMUAT...</span>
+                </div>
+            </div>
+
+            <!-- Tombol Lampu 2 -->
+            <div id="card-2" class="bg-slate-800/80 rounded-[2rem] p-5 flex flex-col items-center justify-between border-2 card-off transition-all duration-300 cursor-pointer h-64" onclick="toggleLamp(2)">
+                <div class="text-center mb-2">
+                    <h2 class="font-bold text-lg">Kontrol 2</h2>
+                    <p class="text-xs text-gray-400">Dalam Rumah</p>
+                </div>
+                <div id="icon-bg-2" class="w-24 h-24 rounded-full border-2 border-slate-500 flex items-center justify-center mb-2 transition-all duration-300">
+                    <i id="icon-2" class="fa-solid fa-lightbulb text-slate-400 text-4xl"></i>
+                </div>
+                <div id="badge-2" class="bg-slate-600 text-gray-300 text-xs font-bold px-5 py-2 rounded-full flex items-center gap-2 mt-auto">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full"></div> <span id="text-2">MEMUAT...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="absolute bottom-6 left-0 right-0 text-center">
+            <p class="text-sm font-medium text-gray-400 tracking-wide">dibuat oleh FST UIBU</p>
+        </div>
+    </div>
+
+    <!-- Script Logika, Blynk, dan PWA Registration -->
+    <script>
+        // === REGISTRASI SERVICE WORKER UNTUK PWA ===
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => console.log('ServiceWorker sukses didaftarkan:', registration.scope))
+                    .catch(error => console.log('ServiceWorker gagal didaftarkan:', error));
+            });
+        }
+
+        // === KONFIGURASI BLYNK ===
+        const BLYNK_AUTH = "sS4Y7StYeZunAxAbf_hUv-Ezd2LKUX4_"; 
+        const BLYNK_BASE_URL = "https://blynk.cloud/external/api"; 
+
+        let lampState = { 1: false, 2: false };
+
+        async function fetchInitialStatus() {
+            // Cek apakah perangkat memiliki koneksi internet
+            if (!navigator.onLine) {
+                document.getElementById('status-text').innerText = "Mode Offline (Menunggu Jaringan)";
+                document.getElementById('sync-icon').className = "fa-solid fa-wifi-slash text-red-500";
+                return;
+            }
+
+            try {
+                const [res1, res2] = await Promise.all([
+                    fetch(`${BLYNK_BASE_URL}/get?token=${BLYNK_AUTH}&v0`),
+                    fetch(`${BLYNK_BASE_URL}/get?token=${BLYNK_AUTH}&v1`)
+                ]);
+
+                if (res1.ok && res2.ok) {
+                    const val1 = await res1.text();
+                    const val2 = await res2.text();
+
+                    lampState[1] = (val1 === "0");
+                    lampState[2] = (val2 === "0");
+
+                    updateUI(1, lampState[1]);
+                    updateUI(2, lampState[2]);
+
+                    document.getElementById('status-text').innerText = "Semua perangkat online";
+                    document.getElementById('sync-icon').className = "fa-solid fa-signal";
+                }
+            } catch (error) {
+                console.error("Gagal terhubung ke Blynk:", error);
+                document.getElementById('status-text').innerText = "Gagal terhubung ke server";
+                document.getElementById('sync-icon').className = "fa-solid fa-triangle-exclamation text-yellow-500";
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', fetchInitialStatus);
+
+        async function toggleLamp(id) {
+            if (!navigator.onLine) {
+                alert("Tidak ada koneksi internet!");
+                return;
+            }
+
+            lampState[id] = !lampState[id];
+            const isOn = lampState[id];
+
+            updateUI(id, isOn);
+
+            const vPin = id === 1 ? 'v0' : 'v1';
+            const value = isOn ? 0 : 1;
+
+            try {
+                await fetch(`${BLYNK_BASE_URL}/update?token=${BLYNK_AUTH}&${vPin}=${value}`);
+            } catch (error) {
+                console.error("Gagal mengirim perintah:", error);
+                // Kembalikan ke state semula jika gagal
+                lampState[id] = !lampState[id];
+                updateUI(id, lampState[id]);
+            }
+        }
+
+        function updateUI(id, isOn) {
+            const card = document.getElementById(`card-${id}`);
+            const icon = document.getElementById(`icon-${id}`);
+            const iconBg = document.getElementById(`icon-bg-${id}`);
+            const badge = document.getElementById(`badge-${id}`);
+            const text = document.getElementById(`text-${id}`);
+
+            if (isOn) {
+                card.classList.remove('card-off');
+                card.classList.add('card-on');
+                iconBg.classList.replace('border-slate-500', 'border-yellow-500');
+                icon.classList.replace('text-slate-400', 'text-yellow-400');
+                icon.classList.add('drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]');
+                
+                badge.className = "bg-green-500 text-white text-xs font-bold px-5 py-2 rounded-full flex items-center gap-2 mt-auto";
+                badge.innerHTML = '<div class="w-2 h-2 bg-white rounded-full"></div>';
+                text.innerText = "HIDUP";
+                badge.appendChild(text);
+            } else {
+                card.classList.remove('card-on');
+                card.classList.add('card-off');
+                iconBg.classList.replace('border-yellow-500', 'border-slate-500');
+                icon.classList.replace('text-yellow-400', 'text-slate-400');
+                icon.classList.remove('drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]');
+                
+                badge.className = "bg-slate-600 text-gray-300 text-xs font-bold px-5 py-2 rounded-full flex items-center gap-2 mt-auto";
+                badge.innerHTML = '<div class="w-2 h-2 bg-gray-400 rounded-full"></div>';
+                text.innerText = "MATI";
+                badge.appendChild(text);
+            }
+        }
+    </script>
+</body>
+</html>
